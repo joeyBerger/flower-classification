@@ -271,13 +271,12 @@ def process_image(image):
         returns an Numpy array
     '''
 
-    image = image.resize((256, 256))
+    image.thumbnail((256, 256))
     
     width, height = image.size
 
     # Calculate the dimensions for the center crop
-    # For example, let's crop a square region from the center
-    size = min(width, height)
+    size = 224
     left = (width - size) / 2
     top = (height - size) / 2
     right = (width + size) / 2
@@ -291,7 +290,8 @@ def process_image(image):
     
     numpy_array = np.array(image)
     
-    numpy_array = (numpy_array - means) / stds
+#     numpy_array = (numpy_array - means) / stds
+    numpy_array = (numpy_array / 255 - means) / stds
 
     # Reorder the dimensions to match PyTorch's expectation (from HWC to CHW)
     return torch.from_numpy(numpy_array.transpose((2, 0, 1))) 
@@ -347,23 +347,17 @@ def predict(image_path, model, topk=5):
     '''
     model.eval()
 
-    img = process_image(image_path)
+    img = process_image(Image.open(image_path))
     
     with torch.no_grad():
         img = img.to(device)
         output = model.forward(torch.unsqueeze(img.float(), 0))
 
     ps = torch.exp(output)
-    print(ps.shape)
     
     top_p, top_class = ps.topk(5, dim=1)
     
     return top_p, top_class
-    
-image = Image.open(test_dir + "/1/image_06743.jpg")
-print(predict(image, model))
-    
-    # TODO: Implement the code to predict the class from an image file
 
 ## Sanity Checking
 
@@ -373,11 +367,56 @@ Now that you can use a trained model for predictions, check to make sure it make
 
 You can convert from the class integer encoding to actual flower names with the `cat_to_name.json` file (should have been loaded earlier in the notebook). To show a PyTorch tensor as an image, use the `imshow` function defined above.
 
-# TODO: Display an image along with the top 5 classes
+def get_categories_keys(classes):
+    keys = []
+    for item in classes[0]:
+        keys.append(str(item.item() + 1))
+    return keys
 
-image = Image.open(test_dir + "/1/image_06743.jpg")
-# predict(image, cloned_model)
-# probs, classes = predict(image, model)
+def get_categories_names(keys):
+    return [cat_to_name[key] for key in keys]
+
+
+
+# TODO: Display an image along with the top 5 classes
+probs, classes = predict(test_dir + "/1/image_06743.jpg", model)
+
+categories_keys = get_categories_keys(classes)
+
+categories_names = get_categories_names(categories_keys)
+
+fig, ax = plt.subplots()
+
+predicted_name = categories_names[0]
+
+ax.imshow(Image.open(test_dir + "/1/image_06743.jpg"))  # Use 'cmap' for grayscale images
+
+# Add title
+ax.set_title(predicted_name)
+
+plt.xticks([])
+plt.yticks([])
+
+# Show the plot
+plt.show()
+
+percentages = probs.squeeze().cpu().numpy()
+percentages = np.flip(percentages)
+categories_names.reverse()
+
+# Create a horizontal bar plot
+plt.barh(np.arange(len(categories_names)), percentages, color='skyblue')
+
+# Set the y-axis labels as category names
+plt.yticks(np.arange(len(categories_names)), categories_names)
+
+# Adjust the plot layout
+plt.tight_layout()
+
+# Show the plot
+plt.show()
+
+
 
 ## Reminder for Workspace users
 If your network becomes very large when saved as a checkpoint, there might be issues with saving backups in your workspace. You should reduce the size of your hidden layers and train again. 
