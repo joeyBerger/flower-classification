@@ -97,7 +97,7 @@ test_data = datasets.ImageFolder(test_dir, transform=test_transforms)
 image_datasets = [train_data, validate_data, test_data]
 
 
-# TODO: Using the image datasets and the trainforms, define the dataloaders
+# Using the image datasets and the trainforms, define the dataloaders
 trainloader = torch.utils.data.DataLoader(train_data, batch_size=64, shuffle=True)
 validationloader = torch.utils.data.DataLoader(validate_data, batch_size=64)
 testloader = torch.utils.data.DataLoader(test_data, batch_size=64)
@@ -136,11 +136,10 @@ If your network is over 1 GB when saved as a checkpoint, there might be issues w
 
 # Use GPU if it's available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(device)
 
-# TODO: Build and train your network
 model = models.densenet121(pretrained=True)
-print(model)
+
+# Build and train network
 
 for param in model.parameters():
     param.requires_grad = False
@@ -221,7 +220,7 @@ Now that your network is trained, save the model so you can load it later for ma
 
 Remember that you'll want to completely rebuild the model later so you can use it for inference. Make sure to include any information you need in the checkpoint. If you want to load the model and keep training, you'll want to save the number of epochs as well as the optimizer state, `optimizer.state_dict`. You'll likely want to use this trained model in the next part of the project, so best to save it now.
 
-print(model)
+### print(model.state_dict())
 # TODO: uncomment...
 # torch.save(model.state_dict(), 'checkpoint.pth')
 
@@ -231,6 +230,7 @@ print(model)
 At this point it's good to write a function that can load a checkpoint and rebuild the model. That way you can come back to this project and keep working on it without having to retrain the network.
 
 # TODO: Write a function that loads a checkpoint and rebuilds the model
+model = models.densenet121()
 state_dict = torch.load('checkpoint.pth')
 model.load_state_dict(state_dict)
 
@@ -270,23 +270,6 @@ def process_image(image):
     ''' Scales, crops, and normalizes a PIL image for a PyTorch model,
         returns an Numpy array
     '''
-    
-#     # Define transformations for preprocessing
-#     preprocess = transforms.Compose([
-#         transforms.Resize(256),
-#         transforms.CenterCrop(224),
-#         transforms.ToTensor(),
-#         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-#     ])
-
-#     # Apply the transformations to the input image
-#     img_tensor = preprocess(image)
-
-#     # Convert the PyTorch tensor to a NumPy array
-#     img_np = img_tensor.numpy()
-
-#     return img_np
-
 
     image = image.resize((256, 256))
     
@@ -303,41 +286,12 @@ def process_image(image):
     # Crop the image using the calculated dimensions
     image = image.crop((left, top, right, bottom))
 
-    # Define the transformations to be applied
-    resize = transforms.Resize((256, 256))
-    center_crop = transforms.CenterCrop(224)
-    to_tensor = transforms.ToTensor()
-    normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225]
-    )
-
-    # Apply the transformations step by step
-#     resized_image = resize(image)
-#     cropped_image = center_crop(resized_image)
-#     tensor_image = to_tensor(cropped_image)
-#     normalized_image = normalize(tensor_image)
-
-    # Ensure the color channel is the first dimension
-#     normalized_image = normalized_image.permute(2, 0, 1)
-    
-#     numpy_array = np.array(normalized_image)
-
-#     print(type(numpy_array))
-#     numpy_array.transpose()
-    
-    # Convert the PIL image to a NumPy array
-    
     means = np.array([0.485, 0.456, 0.406])
     stds = np.array([0.229, 0.224, 0.225])
     
     numpy_array = np.array(image)
     
     numpy_array = (numpy_array - means) / stds
-    
-#     numpy_array = np.clip(numpy_array, 0, 1)
-    
-#     numpy_array = np.array(normalized_image)
 
     # Reorder the dimensions to match PyTorch's expectation (from HWC to CHW)
     return torch.from_numpy(numpy_array.transpose((2, 0, 1))) 
