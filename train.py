@@ -8,10 +8,13 @@ import torch.nn.functional as F
 from torchvision import datasets, transforms, models
 import numpy as np
 import json
-
 from get_cli_args import get_cli_args
 
-data_dir = 'flowers'
+# Get user cli inputs
+data_dir, arch_id, learning_rate, hidden_units, epochs, enable_gpu = get_cli_args()
+print(learning_rate)
+
+# data_dir = 'flowers'
 train_dir = data_dir + '/train'
 valid_dir = data_dir + '/valid'
 
@@ -40,11 +43,7 @@ validationloader = torch.utils.data.DataLoader(validate_data, batch_size=64)
 with open('cat_to_name.json', 'r') as f:
     cat_to_name = json.load(f)
 
-data_dir, arch_id, learning_rate, hidden_units, epochs, enable_gpu = get_cli_args()
-print(learning_rate)
-
 device = torch.device("cuda" if torch.cuda.is_available() and enable_gpu else "cpu")
-print(device, epochs, enable_gpu, hidden_units, arch_id)
 
 if arch_id == 0:
     model = models.densenet121(pretrained=True)
