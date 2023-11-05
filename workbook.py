@@ -139,6 +139,25 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model = models.densenet121(pretrained=True)
 
+def testModel(loader):
+    test_loss = 0
+    accuracy = 0
+    with torch.no_grad():
+        for inputs, labels in loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            logps = model.forward(inputs)
+            batch_loss = criterion(logps, labels)
+
+            test_loss += batch_loss.item()
+
+            # Calculate accuracy
+            ps = torch.exp(logps)
+            top_p, top_class = ps.topk(1, dim=1)
+            equals = top_class == labels.view(*top_class.shape)
+            accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
+            
+    return test_loss, accuracy
+
 # Build and train network
 
 for param in model.parameters():
@@ -180,10 +199,13 @@ for epoch in range(epochs):
         optimizer.step()
         running_loss += loss.item()
         
-#         if steps % print_every == 0:
+        if steps % print_every == 0:
 #             test_loss = 0
 #             accuracy = 0
-#             model.eval()
+            model.eval()
+    
+            test_loss, accuracy = testModel(testloader)
+    
 #             with torch.no_grad():
 #                 for inputs, labels in validationloader:
 #                     inputs, labels = inputs.to(device), labels.to(device)
@@ -198,12 +220,12 @@ for epoch in range(epochs):
 #                     equals = top_class == labels.view(*top_class.shape)
 #                     accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
                     
-#             print(f"Epoch {epoch+1}/{epochs}.. "
-#                   f"Train loss: {running_loss/print_every:.3f}.. "
-#                   f"Test loss: {test_loss/len(testloader):.3f}.. "
-#                   f"Test accuracy: {accuracy/len(testloader):.3f}")
-#             running_loss = 0
-#             model.train()
+            print(f"Epoch {epoch+1}/{epochs}.. "
+                  f"Train loss: {running_loss/print_every:.3f}.. "
+                  f"Test loss: {test_loss/len(validationloader):.3f}.. "
+                  f"Test accuracy: {accuracy/len(validationloader):.3f}")
+            running_loss = 0
+            model.train()
 
 
 ## Testing your network
@@ -211,6 +233,32 @@ for epoch in range(epochs):
 It's good practice to test your trained network on test data, images the network has never seen either in training or validation. This will give you a good estimate for the model's performance on completely new images. Run the test images through the network and measure the accuracy, the same way you did validation. You should be able to reach around 70% accuracy on the test set if the model has been trained well.
 
 # TODO: Do validation on the test set
+# if steps % print_every == 0:
+
+# test_loss = 0
+# accuracy = 0
+model.eval()
+test_loss, accuracy = testModel(testloader)
+# with torch.no_grad():
+#     for inputs, labels in testloader:
+#         inputs, labels = inputs.to(device), labels.to(device)
+#         logps = model.forward(inputs)
+#         batch_loss = criterion(logps, labels)
+
+#         test_loss += batch_loss.item()
+        
+#         # Calculate accuracy
+#         ps = torch.exp(logps)
+#         top_p, top_class = ps.topk(1, dim=1)
+#         equals = top_class == labels.view(*top_class.shape)
+#         accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
+
+
+
+print(f"Test loss: {test_loss/len(testloader):.3f}.. "
+      f"Test accuracy: {accuracy/len(testloader):.3f}")
+
+
 
 ## Save the checkpoint
 
