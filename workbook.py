@@ -73,7 +73,7 @@ train_dir = data_dir + '/train'
 valid_dir = data_dir + '/valid'
 test_dir = data_dir + '/test'
 
-# TODO: Define your transforms for the training, validation, and testing sets __do you need to store in list?
+# Define transforms for the training, validation, and testing sets __do you need to store in list?
 train_transforms = transforms.Compose([transforms.RandomRotation(30),
                                        transforms.RandomResizedCrop(224),
                                        transforms.RandomHorizontalFlip(),
@@ -87,22 +87,16 @@ validation_transforms = transforms.Compose([transforms.Resize(255),
                                                            [0.229, 0.224, 0.225])])
 test_transforms = validation_transforms
 
-data_transforms = [train_transforms, validation_transforms, test_transforms]
-
-# TODO: Load the datasets with ImageFolder
+# Load the datasets with ImageFolder
 train_data = datasets.ImageFolder(train_dir, transform=train_transforms)
 validate_data = datasets.ImageFolder(valid_dir, transform=validation_transforms)
 test_data = datasets.ImageFolder(test_dir, transform=test_transforms)
-
-image_datasets = [train_data, validate_data, test_data]
 
 
 # Using the image datasets and the trainforms, define the dataloaders
 trainloader = torch.utils.data.DataLoader(train_data, batch_size=64, shuffle=True)
 validationloader = torch.utils.data.DataLoader(validate_data, batch_size=64)
 testloader = torch.utils.data.DataLoader(test_data, batch_size=64)
-
-dataloaders = [trainloader, validationloader, testloader]
 
 ### Label mapping
 
@@ -163,24 +157,30 @@ def testModel(loader):
 for param in model.parameters():
     param.requires_grad = False
     
+classifier_inputs = 1024
+hidden_layers = 256
+dropout = 0.2
+outputs = 102
+
 from collections import OrderedDict
-model.classifier = nn.Sequential(nn.Linear(1024, 500),
+model.classifier = nn.Sequential(nn.Linear(classifier_inputs, hidden_layers),
                                  nn.ReLU(),
-                                 nn.Dropout(0.2, inplace=False),
-                                 nn.Linear(500, 102),
+                                 nn.Dropout(dropout),
+                                 nn.Linear(hidden_layers, outputs),
                                  nn.LogSoftmax(dim=1))
 
 criterion = nn.NLLLoss()
 
-# Only train the classifier parameters, feature parameters are frozen
 optimizer = optim.Adam(model.classifier.parameters(), lr=0.003)
 
 model.to(device);
 
 epochs = 1
 steps = 0
+validate_model = False
 running_loss = 0
 print_every = 5
+
 for epoch in range(epochs):
        
     for inputs, labels in trainloader:
@@ -199,27 +199,11 @@ for epoch in range(epochs):
         optimizer.step()
         running_loss += loss.item()
         
-        if steps % print_every == 0:
-#             test_loss = 0
-#             accuracy = 0
+        if validate_model and steps % print_every == 0:
             model.eval()
     
-            test_loss, accuracy = testModel(testloader)
+            test_loss, accuracy = testModel(validationloader)
     
-#             with torch.no_grad():
-#                 for inputs, labels in validationloader:
-#                     inputs, labels = inputs.to(device), labels.to(device)
-#                     logps = model.forward(inputs)
-#                     batch_loss = criterion(logps, labels)
-                    
-#                     test_loss += batch_loss.item()
-                    
-#                     # Calculate accuracy
-#                     ps = torch.exp(logps)
-#                     top_p, top_class = ps.topk(1, dim=1)
-#                     equals = top_class == labels.view(*top_class.shape)
-#                     accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
-                    
             print(f"Epoch {epoch+1}/{epochs}.. "
                   f"Train loss: {running_loss/print_every:.3f}.. "
                   f"Test loss: {test_loss/len(validationloader):.3f}.. "
@@ -232,28 +216,8 @@ for epoch in range(epochs):
 
 It's good practice to test your trained network on test data, images the network has never seen either in training or validation. This will give you a good estimate for the model's performance on completely new images. Run the test images through the network and measure the accuracy, the same way you did validation. You should be able to reach around 70% accuracy on the test set if the model has been trained well.
 
-# TODO: Do validation on the test set
-# if steps % print_every == 0:
-
-# test_loss = 0
-# accuracy = 0
 model.eval()
 test_loss, accuracy = testModel(testloader)
-# with torch.no_grad():
-#     for inputs, labels in testloader:
-#         inputs, labels = inputs.to(device), labels.to(device)
-#         logps = model.forward(inputs)
-#         batch_loss = criterion(logps, labels)
-
-#         test_loss += batch_loss.item()
-        
-#         # Calculate accuracy
-#         ps = torch.exp(logps)
-#         top_p, top_class = ps.topk(1, dim=1)
-#         equals = top_class == labels.view(*top_class.shape)
-#         accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
-
-
 
 print(f"Test loss: {test_loss/len(testloader):.3f}.. "
       f"Test accuracy: {accuracy/len(testloader):.3f}")
@@ -268,24 +232,39 @@ Now that your network is trained, save the model so you can load it later for ma
 
 Remember that you'll want to completely rebuild the model later so you can use it for inference. Make sure to include any information you need in the checkpoint. If you want to load the model and keep training, you'll want to save the number of epochs as well as the optimizer state, `optimizer.state_dict`. You'll likely want to use this trained model in the next part of the project, so best to save it now.
 
-### print(model.state_dict())
-# TODO: uncomment...
-# torch.save(model.state_dict(), 'checkpoint.pth')
+model_dict={'arch': 'densenet121',
+            'state_dict': model.state_dict(), 
+            'epochs': epochs,
+            'device': device,
+            'classifier_inputs': classifier_inputs,
+            'hidden_layers': hidden_layers,
+            'dropout': dropout,
+            'outputs': outputs
+           }
+
+torch.save(model_dict, 'checkpoint.pth')
+print('Save Complete')
 
 
 ## Loading the checkpoint
 
 At this point it's good to write a function that can load a checkpoint and rebuild the model. That way you can come back to this project and keep working on it without having to retrain the network.
 
-# TODO: Write a function that loads a checkpoint and rebuilds the model
-model = models.densenet121()
-state_dict = torch.load('checkpoint.pth')
-model.load_state_dict(state_dict)
+#  Write function that loads a checkpoint and rebuilds the model
+checkpoint = torch.load('checkpoint.pth')
 
-# import copy
-# cloned_model = copy.deepcopy(model)
+temp_model = models.densenet121()
+temp_model.classifier = nn.Sequential(nn.Linear(checkpoint['classifier_inputs'], checkpoint['hidden_layers']),
+                                 nn.ReLU(),
+                                 nn.Dropout(checkpoint['dropout']),
+                                 nn.Linear(checkpoint['hidden_layers'], checkpoint['outputs']),
+                                 nn.LogSoftmax(dim=1))
 
 
+
+#TODO: update temp_model
+temp_model.load_state_dict(checkpoint['state_dict'], strict=False)
+temp_model.to(checkpoint['device']);
 
 # Inference for classification
 
@@ -337,8 +316,6 @@ def process_image(image):
     stds = np.array([0.229, 0.224, 0.225])
     
     numpy_array = np.array(image)
-    
-#     numpy_array = (numpy_array - means) / stds
     numpy_array = (numpy_array / 255 - means) / stds
 
     # Reorder the dimensions to match PyTorch's expectation (from HWC to CHW)
@@ -424,10 +401,8 @@ def get_categories_keys(classes):
 def get_categories_names(keys):
     return [cat_to_name[key] for key in keys]
 
-
-
 # TODO: Display an image along with the top 5 classes
-probs, classes = predict(test_dir + "/1/image_06743.jpg", model)
+probs, classes = predict(test_dir + "/1/image_06743.jpg", temp_model)
 
 categories_keys = get_categories_keys(classes)
 
@@ -463,8 +438,6 @@ plt.tight_layout()
 
 # Show the plot
 plt.show()
-
-
 
 ## Reminder for Workspace users
 If your network becomes very large when saved as a checkpoint, there might be issues with saving backups in your workspace. You should reduce the size of your hidden layers and train again. 
