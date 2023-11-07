@@ -8,13 +8,11 @@ import torch.nn.functional as F
 from torchvision import datasets, transforms, models
 import numpy as np
 import json
-from get_cli_args import get_cli_args
+from get_cli_args import get_train_cli_args
 
 # Get user cli inputs
-data_dir, arch_id, learning_rate, hidden_units, epochs, enable_gpu = get_cli_args()
-print(learning_rate)
+data_dir, arch_id, learning_rate, hidden_units, epochs, enable_gpu = get_train_cli_args()
 
-# data_dir = 'flowers'
 train_dir = data_dir + '/train'
 valid_dir = data_dir + '/valid'
 
@@ -30,7 +28,6 @@ validation_transforms = transforms.Compose([transforms.Resize(255),
                                       transforms.ToTensor(),
                                       transforms.Normalize([0.485, 0.456, 0.406],
                                                            [0.229, 0.224, 0.225])])
-test_transforms = validation_transforms
 
 # Load the datasets with ImageFolder
 train_data = datasets.ImageFolder(train_dir, transform=train_transforms)
@@ -47,11 +44,12 @@ device = torch.device("cuda" if torch.cuda.is_available() and enable_gpu else "c
 
 if arch_id == 0:
     model = models.densenet121(pretrained=True)
-    model_ouputs = 1024
+    classifier_inputs = 1024
+    arch = 'densenet121'
 else:
     model = models.vgg16(pretrained=True)
-    model_ouputs = 25088
-    
+    classifier_inputs = 25088
+    arch = 'vgg16'
 
 def testModel(loader):
     test_loss = 0
@@ -78,7 +76,7 @@ for param in model.parameters():
     param.requires_grad = False
     
 from collections import OrderedDict
-model.classifier = nn.Sequential(nn.Linear(model_ouputs, hidden_units),
+model.classifier = nn.Sequential(nn.Linear(classifier_inputs, hidden_units),
                                  nn.ReLU(),
                                  nn.Dropout(0.2),
                                  nn.Linear(hidden_units, 102),
@@ -124,5 +122,16 @@ for epoch in range(epochs):
             running_loss = 0
             model.train()
             
-torch.save(model.state_dict(), 'checkpoint.pth')
+model_dict={'arch': arch,
+            'state_dict': model.state_dict(), 
+            'epochs': epochs,
+            'device': device,
+            'classifier_inputs': classifier_inputs,
+            'hidden_units': hidden_units,
+            'dropout': 0.2,
+            'outputs': 102
+           }
+
+torch.save(model_dict, 'checkpoint.pth')
+
 print('Save Complete')
