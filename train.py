@@ -10,47 +10,6 @@ import numpy as np
 import json
 from get_cli_args import get_train_cli_args
 
-# Get user cli inputs
-data_dir, arch_id, learning_rate, hidden_units, epochs, enable_gpu = get_train_cli_args()
-
-train_dir = data_dir + '/train'
-valid_dir = data_dir + '/valid'
-
-# Define transforms for the training, validation, and testing sets __do you need to store in list?
-train_transforms = transforms.Compose([transforms.RandomRotation(30),
-                                       transforms.RandomResizedCrop(224),
-                                       transforms.RandomHorizontalFlip(),
-                                       transforms.ToTensor(),
-                                       transforms.Normalize([0.485, 0.456, 0.406],
-                                                            [0.229, 0.224, 0.225])])
-validation_transforms = transforms.Compose([transforms.Resize(255),
-                                      transforms.CenterCrop(224),
-                                      transforms.ToTensor(),
-                                      transforms.Normalize([0.485, 0.456, 0.406],
-                                                           [0.229, 0.224, 0.225])])
-
-# Load the datasets with ImageFolder
-train_data = datasets.ImageFolder(train_dir, transform=train_transforms)
-validate_data = datasets.ImageFolder(valid_dir, transform=validation_transforms)
-
-# Using the image datasets and the trainforms, define the dataloaders
-trainloader = torch.utils.data.DataLoader(train_data, batch_size=64, shuffle=True)
-validationloader = torch.utils.data.DataLoader(validate_data, batch_size=64)
-
-with open('cat_to_name.json', 'r') as f:
-    cat_to_name = json.load(f)
-
-device = torch.device("cuda" if torch.cuda.is_available() and enable_gpu else "cpu")
-
-if arch_id == 0:
-    model = models.densenet121(pretrained=True)
-    classifier_inputs = 1024
-    arch = 'densenet121'
-else:
-    model = models.vgg16(pretrained=True)
-    classifier_inputs = 25088
-    arch = 'vgg16'
-
 def testModel(loader):
     test_loss = 0
     accuracy = 0
@@ -69,6 +28,50 @@ def testModel(loader):
             accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
             
     return test_loss, accuracy
+
+# Get user cli inputs
+data_dir, arch_id, learning_rate, hidden_units, epochs, enable_gpu = get_train_cli_args()
+
+# Set directories
+train_dir = data_dir + '/train'
+valid_dir = data_dir + '/valid'
+
+# Define transforms for the training and validation
+train_transforms = transforms.Compose([transforms.RandomRotation(30),
+                                       transforms.RandomResizedCrop(224),
+                                       transforms.RandomHorizontalFlip(),
+                                       transforms.ToTensor(),
+                                       transforms.Normalize([0.485, 0.456, 0.406],
+                                                            [0.229, 0.224, 0.225])])
+
+validation_transforms = transforms.Compose([transforms.Resize(255),
+                                      transforms.CenterCrop(224),
+                                      transforms.ToTensor(),
+                                      transforms.Normalize([0.485, 0.456, 0.406],
+                                                           [0.229, 0.224, 0.225])])
+
+# Load the datasets with ImageFolder
+train_data = datasets.ImageFolder(train_dir, transform=train_transforms)
+validate_data = datasets.ImageFolder(valid_dir, transform=validation_transforms)
+
+# Using the image datasets and the trainforms, define the dataloaders
+trainloader = torch.utils.data.DataLoader(train_data, batch_size=64, shuffle=True)
+validationloader = torch.utils.data.DataLoader(validate_data, batch_size=64)
+
+# Set device
+device = torch.device("cuda" if torch.cuda.is_available() and enable_gpu else "cpu")
+
+# Setup model and classifier details
+if arch_id == 0:
+    model = models.densenet121(pretrained=True)
+    classifier_inputs = 1024
+    arch = 'densenet121'
+else:
+    model = models.vgg16(pretrained=True)
+    classifier_inputs = 25088
+    arch = 'vgg16'
+
+
 
 # Build and train network
 
@@ -89,9 +92,9 @@ optimizer = optim.Adam(model.classifier.parameters(), lr=learning_rate)
 model.to(device);
 
 steps = 0
-validate_model = True
+validate_model = False
 running_loss = 0
-print_every = 5
+validate_every = 5
 for epoch in range(epochs):
        
     for inputs, labels in trainloader:
@@ -110,7 +113,7 @@ for epoch in range(epochs):
         optimizer.step()
         running_loss += loss.item()
         
-        if validate_model and steps % print_every == 0:
+        if validate_model and steps % validate_every == 0:
             model.eval()
     
             test_loss, accuracy = testModel(validationloader)
@@ -121,17 +124,19 @@ for epoch in range(epochs):
                   f"Test accuracy: {accuracy/len(validationloader):.3f}")
             running_loss = 0
             model.train()
-            
+
+# Setup info to save            
 model_dict={'arch': arch,
             'state_dict': model.state_dict(), 
             'epochs': epochs,
-            'device': device,
+            'device': str(device), 
             'classifier_inputs': classifier_inputs,
             'hidden_units': hidden_units,
             'dropout': 0.2,
             'outputs': 102
            }
 
+# Save model info
 torch.save(model_dict, 'checkpoint.pth')
 
 print('Save Complete')
