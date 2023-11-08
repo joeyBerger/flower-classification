@@ -7,7 +7,6 @@ from torch import optim
 import torch.nn.functional as F
 from torchvision import datasets, transforms, models
 import numpy as np
-import json
 from get_cli_args import get_train_cli_args
 
 def testModel(loader):
