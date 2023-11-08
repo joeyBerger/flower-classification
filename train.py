@@ -71,10 +71,7 @@ else:
     classifier_inputs = 25088
     arch = 'vgg16'
 
-
-
 # Build and train network
-
 for param in model.parameters():
     param.requires_grad = False
     
@@ -92,7 +89,7 @@ optimizer = optim.Adam(model.classifier.parameters(), lr=learning_rate)
 model.to(device);
 
 steps = 0
-validate_model = False
+validate_model = True
 running_loss = 0
 validate_every = 5
 for epoch in range(epochs):
